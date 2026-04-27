@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HaiChauInternational Pro APP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root { height: 100%; }
+    body { font-family: 'DM Sans', sans-serif; background: #080e18; }
+    @keyframes mdIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 99px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo, useCallback, useEffect, Fragment } = React;
+
+/* ══════════════════════════════════════════
+   DATA & CONSTANTS
+   ══════════════════════════════════════════ */
+const ALL_PERMISSIONS = [
+  { id: "dashboard.view", module: "Tổng quan", label: "Xem tổng quan", desc: "Xem dashboard, thống kê chung" },
+  { id: "products.view", module: "Sản phẩm", label: "Xem sản phẩm", desc: "Xem danh sách sản phẩm & định mức" },
+  { id: "products.create", module: "Sản phẩm", label: "Thêm sản phẩm", desc: "Tạo sản phẩm mới, cài đặt định mức" },
+  { id: "products.edit", module: "Sản phẩm", label: "Sửa sản phẩm", desc: "Chỉnh sửa thông tin & định mức sản phẩm" },
+  { id: "products.delete", module: "Sản phẩm", label: "Xoá sản phẩm", desc: "Xoá sản phẩm khỏi hệ thống" },
+  { id: "orders.view", module: "Lệnh SX", label: "Xem lệnh SX", desc: "Xem danh sách lệnh sản xuất" },
+  { id: "orders.create", module: "Lệnh SX", label: "Lập lệnh SX", desc: "Tạo lệnh sản xuất mới" },
+  { id: "orders.manage", module: "Lệnh SX", label: "Quản lý lệnh SX", desc: "Bắt đầu SX, hoàn thành, nhập thực tế" },
+  { id: "compare.view", module: "Đối chiếu", label: "Xem đối chiếu ĐM", desc: "Đối chiếu định mức vs thực tế" },
+  { id: "inventory.view", module: "Kho NVL", label: "Xem kho NVL", desc: "Xem tồn kho nguyên vật liệu" },
+  { id: "inventory.create", module: "Kho NVL", label: "Thêm NVL", desc: "Thêm nguyên vật liệu mới" },
+  { id: "inventory.import", module: "Kho NVL", label: "Nhập kho", desc: "Nhập thêm số lượng NVL vào kho" },
+  { id: "users.view", module: "Tài khoản", label: "Xem tài khoản", desc: "Xem danh sách tài khoản người dùng" },
+  { id: "users.create", module: "Tài khoản", label: "Tạo tài khoản", desc: "Tạo tài khoản người dùng mới" },
+  { id: "users.edit", module: "Tài khoản", label: "Sửa tài khoản", desc: "Đổi mật khẩu, phân quyền, xoá tài khoản" },
+];
+
+const PRESET_ROLES = {
+  admin: ALL_PERMISSIONS.map(p => p.id),
+  manager: ["dashboard.view","products.view","products.create","products.edit","orders.view","orders.create","orders.manage","compare.view","inventory.view","inventory.create","inventory.import"],
+  worker: ["dashboard.view","orders.view","inventory.view"],
+};
+
+const INITIAL_USERS = [
+  { id: "U001", username: "admin", password: "admin123", fullName: "Nguyễn Văn An", role: "admin", permissions: [...PRESET_ROLES.admin], created: "2026-01-01" },
+  { id: "U002", username: "nvthanh", password: "123456", fullName: "Trần Văn Thành", role: "manager", permissions: [...PRESET_ROLES.manager], created: "2026-02-15" },
+  { id: "U003", username: "lethuy", password: "123456", fullName: "Lê Thị Thuý", role: "worker", permissions: [...PRESET_ROLES.worker], created: "2026-03-01" },
+];
+
+const INITIAL_MATERIALS = [
+  { id: "NVL001", name: "Cam tươi", unit: "kg", stock: 1200, price: 25000, supplier: "Trang trại Đà Lạt" },
+  { id: "NVL002", name: "Đường tinh luyện", unit: "kg", stock: 300, price: 18000, supplier: "Công ty Biên Hoà" },
+  { id: "NVL003", name: "Sữa tươi nguyên liệu", unit: "lít", stock: 800, price: 32000, supplier: "TH True Milk" },
+  { id: "NVL004", name: "Chai nhựa PET 1L", unit: "cái", stock: 15000, price: 1500, supplier: "Nhựa Bình Minh" },
+  { id: "NVL005", name: "Lá trà xanh", unit: "kg", stock: 450, price: 120000, supplier: "Trà Thái Nguyên" },
+  { id: "NVL006", name: "Hộp nhựa PP 150ml", unit: "cái", stock: 8000, price: 800, supplier: "Nhựa Bình Minh" },
+  { id: "NVL007", name: "Men vi sinh", unit: "kg", stock: 50, price: 850000, supplier: "Chr. Hansen VN" },
+  { id: "NVL008", name: "Bột mì đa dụng", unit: "kg", stock: 600, price: 15000, supplier: "Bột Bình An" },
+  { id: "NVL009", name: "Nắp chai nhựa", unit: "cái", stock: 16000, price: 500, supplier: "Nhựa Bình Minh" },
+  { id: "NVL010", name: "Nhãn dán sản phẩm", unit: "cái", stock: 20000, price: 200, supplier: "In Tiến Phát" },
+];
+
+const INITIAL_PRODUCTS = [
+  {
+    id: "SP001", name: "Nước cam ép 1L", unit: "chai", category: "Nước giải khát",
+    bom: [
+      { materialId: "NVL001", qty: 2.5, note: "2.5kg cam / 1 chai" },
+      { materialId: "NVL002", qty: 0.08, note: "80g đường / chai" },
+      { materialId: "NVL004", qty: 1, note: "1 chai PET" },
+      { materialId: "NVL009", qty: 1, note: "1 nắp chai" },
+      { materialId: "NVL010", qty: 1, note: "1 nhãn dán" },
+    ]
+  },
+  {
+    id: "SP002", name: "Sữa chua trái cây 150ml", unit: "hộp", category: "Sữa chua",
+    bom: [
+      { materialId: "NVL003", qty: 0.14, note: "140ml sữa / hộp" },
+      { materialId: "NVL002", qty: 0.02, note: "20g đường / hộp" },
+      { materialId: "NVL007", qty: 0.001, note: "1g men / hộp" },
+      { materialId: "NVL006", qty: 1, note: "1 hộp PP" },
+      { materialId: "NVL010", qty: 1, note: "1 nhãn dán" },
+    ]
+  },
+  {
+    id: "SP003", name: "Trà xanh đóng chai 500ml", unit: "chai", category: "Nước giải khát",
+    bom: [
+      { materialId: "NVL005", qty: 0.015, note: "15g trà / chai" },
+      { materialId: "NVL002", qty: 0.05, note: "50g đường / chai" },
+      { materialId: "NVL004", qty: 1, note: "1 chai PET" },
+      { materialId: "NVL009", qty: 1, note: "1 nắp chai" },
+      { materialId: "NVL010", qty: 1, note: "1 nhãn dán" },
+    ]
+  },
+];
+
+const INITIAL_ORDERS = [
+  {
+    id: "LSX001", productId: "SP001", plannedQty: 1000, actualQty: null,
+    status: "completed", createdBy: "U002", createdAt: "2026-04-10", completedAt: "2026-04-15",
+    note: "Đơn VinMart",
+    actualMaterials: [
+      { materialId: "NVL001", planned: 2500, actual: 2620 },
+      { materialId: "NVL002", planned: 80, actual: 85 },
+      { materialId: "NVL004", planned: 1000, actual: 1015 },
+      { materialId: "NVL009", planned: 1000, actual: 1015 },
+      { materialId: "NVL010", planned: 1000, actual: 1020 },
+    ],
+    actualOutput: 980,
+  },
+  {
+    id: "LSX002", productId: "SP002", plannedQty: 5000, actualQty: null,
+    status: "processing", createdBy: "U002", createdAt: "2026-04-18", completedAt: null,
+    note: "Đơn Bách Hoá Xanh",
+    actualMaterials: [], actualOutput: null,
+  },
+  {
+    id: "LSX003", productId: "SP003", plannedQty: 3000, actualQty: null,
+    status: "pending", createdBy: "U001", createdAt: "2026-04-22", completedAt: null,
+    note: "Đơn Circle K tháng 5",
+    actualMaterials: [], actualOutput: null,
+  },
+];
+
+const ROLES = { admin: "Quản trị viên", manager: "Quản lý", worker: "Công nhân" };
+const STATUS_CFG = {
+  pending: { label: "Chờ SX", color: "#D97706", bg: "#FEF3C7", icon: "⏳" },
+  processing: { label: "Đang SX", color: "#2563EB", bg: "#DBEAFE", icon: "⚙️" },
+  completed: { label: "Hoàn thành", color: "#059669", bg: "#D1FAE5", icon: "✅" },
+  cancelled: { label: "Đã huỷ", color: "#DC2626", bg: "#FEE2E2", icon: "❌" },
+};
+
+const APP_NAME = "HaiChauInternational";
+const APP_SUB = "Pro APP";
+
+const getVisibleTabs = (user) => {
+  const tabs = [];
+  if (hasPerm(user, "dashboard.view")) tabs.push({ id: "dashboard", label: "Tổng quan", icon: "◈" });
+  if (hasPerm(user, "products.view")) tabs.push({ id: "products", label: "Sản phẩm & Định mức", icon: "◇" });
+  if (hasPerm(user, "orders.view")) tabs.push({ id: "orders", label: "Lệnh sản xuất", icon: "◆" });
+  if (hasPerm(user, "compare.view")) tabs.push({ id: "compare", label: "Đối chiếu ĐM", icon: "◫" });
+  if (hasPerm(user, "inventory.view")) tabs.push({ id: "inventory", label: "Kho NVL", icon: "▣" });
+  if (hasPerm(user, "users.view")) tabs.push({ id: "users", label: "Tài khoản & Phân quyền", icon: "◉" });
+  return tabs;
+};
+
+const hasPerm = (user, perm) => user?.permissions?.includes(perm) || false;
+
+const fmt = n => new Intl.NumberFormat("vi-VN").format(n);
+const fmtC = n => fmt(n) + "đ";
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+/* ══════════════════════════════════════════
+   REUSABLE UI COMPONENTS
+   ══════════════════════════════════════════ */
+const css = {
+  input: { width:"100%", padding:"9px 12px", borderRadius:6, border:"1px solid #2a3a4a", background:"#0d1b2a", color:"#e0e6ed", fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit" },
+  select: { width:"100%", padding:"9px 12px", borderRadius:6, border:"1px solid #2a3a4a", background:"#0d1b2a", color:"#e0e6ed", fontSize:13, outline:"none", boxSizing:"border-box", fontFamily:"inherit", appearance:"auto" },
+  btnP: { padding:"9px 20px", borderRadius:6, border:"none", background:"#0ea5e9", color:"#fff", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all .15s" },
+  btnS: { padding:"9px 20px", borderRadius:6, border:"1px solid #2a3a4a", background:"transparent", color:"#94a3b8", fontWeight:500, fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all .15s" },
+  btnD: { padding:"9px 20px", borderRadius:6, border:"none", background:"#dc2626", color:"#fff", fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit" },
+  card: { background:"#111d2e", borderRadius:10, border:"1px solid #1e2d3d", padding:20 },
+  th: { textAlign:"left", padding:"10px 10px", color:"#64748b", fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:0.5, borderBottom:"1px solid #1e2d3d" },
+  td: { padding:"10px 10px", borderBottom:"1px solid #141f2e", fontSize:13, color:"#cbd5e1" },
+};
+
+const Badge = ({ status }) => {
+  const c = STATUS_CFG[status] || STATUS_CFG.pending;
+  return <span style={{ background:c.bg, color:c.color, padding:"3px 10px", borderRadius:4, fontSize:11, fontWeight:700, letterSpacing:0.3 }}>{c.icon} {c.label}</span>;
+};
+
+const RoleBadge = ({ role }) => {
+  const m = { admin:{ bg:"#fef3c7", c:"#d97706" }, manager:{ bg:"#dbeafe", c:"#2563eb" }, worker:{ bg:"#d1fae5", c:"#059669" } };
+  const s = m[role] || m.worker;
+  return <span style={{ background:s.bg, color:s.c, padding:"2px 8px", borderRadius:4, fontSize:11, fontWeight:600 }}>{ROLES[role]}</span>;
+};
+
+const Modal = ({ open, onClose, title, wide, children }) => {
+  if (!open) return null;
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={onClose}>
+      <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)" }} />
+      <div onClick={e=>e.stopPropagation()} style={{
+        position:"relative", background:"#0f1a2b", border:"1px solid #1e2d3d", borderRadius:12, padding:28,
+        width:"92%", maxWidth: wide ? 860 : 520, maxHeight:"88vh", overflowY:"auto",
+        boxShadow:"0 24px 80px rgba(0,0,0,0.5)", animation:"mdIn .2s ease"
+      }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <h3 style={{ margin:0, fontSize:17, fontWeight:700, color:"#e2e8f0" }}>{title}</h3>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#64748b" }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const Field = ({ label, children }) => (
+  <div style={{ marginBottom:14 }}>
+    <label style={{ fontSize:12, fontWeight:600, color:"#94a3b8", display:"block", marginBottom:5, textTransform:"uppercase", letterSpacing:0.4 }}>{label}</label>
+    {children}
+  </div>
+);
+
+const StatCard = ({ icon, label, value, accent }) => (
+  <div style={{ ...css.card, position:"relative", overflow:"hidden" }}>
+    <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:accent }} />
+    <div style={{ fontSize:11, color:"#64748b", fontWeight:600, textTransform:"uppercase", letterSpacing:0.5, marginBottom:6 }}>{icon} {label}</div>
+    <div style={{ fontSize:26, fontWeight:800, color:"#e2e8f0", letterSpacing:-1 }}>{value}</div>
+  </div>
+);
+
+const PermToggle = ({ checked, onChange, disabled }) => (
+  <button onClick={disabled ? undefined : onChange} style={{
+    width:36, height:20, borderRadius:10, border:"none", cursor: disabled?"not-allowed":"pointer",
+    background: checked ? "#0ea5e9" : "#1e2d3d", position:"relative", transition:"background .2s",
+    opacity: disabled ? 0.4 : 1,
+  }}>
+    <div style={{
+      width:16, height:16, borderRadius:8, background:"#fff", position:"absolute", top:2,
+      left: checked ? 18 : 2, transition:"left .2s", boxShadow:"0 1px 3px rgba(0,0,0,0.3)"
+    }} />
+  </button>
+);
+
+/* ══════════════════════════════════════════
+   LOGIN SCREEN
+   ══════════════════════════════════════════ */
+const LoginScreen = ({ users, onLogin }) => {
+  const [u, setU] = useState("");
+  const [p, setP] = useState("");
+  const [err, setErr] = useState("");
+  const [show, setShow] = useState(false);
+
+  const submit = () => {
+    const found = users.find(x => x.username === u && x.password === p);
+    if (found) { onLogin(found); }
+    else { setErr("Sai tên đăng nhập hoặc mật khẩu"); }
+  };
+
+  return (
+    <div style={{
+      minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
+      background:"#080e18", fontFamily:"'DM Sans', 'Manrope', sans-serif",
+      backgroundImage:"radial-gradient(ellipse at 30% 20%, rgba(14,165,233,0.08) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(6,182,212,0.06) 0%, transparent 50%)"
+    }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+        @keyframes mdIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+      `}</style>
+      <div style={{ width:400, animation:"fadeUp .5s ease", ...css.card, padding:36, borderColor:"#1a2a3a" }}>
+        <div style={{ textAlign:"center", marginBottom:32 }}>
+          <div style={{ fontSize:24, fontWeight:800, color:"#0ea5e9", letterSpacing:-0.5, marginBottom:2, lineHeight:1.2 }}>{APP_NAME}</div>
+          <div style={{ fontSize:16, fontWeight:700, color:"#38bdf8", letterSpacing:1, marginBottom:6 }}>{APP_SUB}</div>
+          <div style={{ fontSize:12, color:"#475569", borderTop:"1px solid #1e2d3d", paddingTop:10, marginTop:6 }}>Hệ thống quản lý sản xuất</div>
+        </div>
+        {err && <div style={{ background:"#1c1017", border:"1px solid #3b1a1a", color:"#f87171", padding:"8px 12px", borderRadius:6, fontSize:12, marginBottom:14, fontWeight:500 }}>{err}</div>}
+        <Field label="Tên đăng nhập">
+          <input style={css.input} value={u} onChange={e=>{setU(e.target.value);setErr("");}} placeholder="Nhập tên đăng nhập" onKeyDown={e=>e.key==="Enter"&&submit()} />
+        </Field>
+        <Field label="Mật khẩu">
+          <div style={{ position:"relative" }}>
+            <input type={show?"text":"password"} style={css.input} value={p} onChange={e=>{setP(e.target.value);setErr("");}} placeholder="Nhập mật khẩu" onKeyDown={e=>e.key==="Enter"&&submit()} />
+            <button onClick={()=>setShow(!show)} style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:12 }}>{show?"ẨN":"HIỆN"}</button>
+          </div>
+        </Field>
+        <button onClick={submit} style={{ ...css.btnP, width:"100%", padding:"11px", marginTop:6, fontSize:14 }}>Đăng nhập</button>
+        <div style={{ marginTop:20, textAlign:"center", fontSize:11, color:"#334155" }}>
+          © 2026 {APP_NAME}. All rights reserved.
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   DASHBOARD
+   ══════════════════════════════════════════ */
+const DashboardPage = ({ products, orders, materials }) => {
+  const active = orders.filter(o=>o.status==="processing").length;
+  const done = orders.filter(o=>o.status==="completed").length;
+  const lowStock = materials.filter(m=>m.stock<100).length;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14 }}>
+        <StatCard icon="◇" label="Sản phẩm" value={products.length} accent="#0ea5e9" />
+        <StatCard icon="◆" label="Lệnh SX" value={orders.length} accent="#8b5cf6" />
+        <StatCard icon="⚙️" label="Đang SX" value={active} accent="#f59e0b" />
+        <StatCard icon="✅" label="Hoàn thành" value={done} accent="#10b981" />
+        <StatCard icon="⚠" label="NVL thấp" value={lowStock} accent="#ef4444" />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        <div style={css.card}>
+          <h4 style={{ margin:"0 0 12px", fontSize:13, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5 }}>Lệnh SX gần đây</h4>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead><tr>{["Mã LSX","Sản phẩm","SL","Trạng thái"].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {orders.slice(0,6).map(o=>{
+                const pr = products.find(p=>p.id===o.productId);
+                return (
+                  <tr key={o.id}>
+                    <td style={{...css.td, fontWeight:700, color:"#0ea5e9", fontFamily:"'JetBrains Mono', monospace"}}>{o.id}</td>
+                    <td style={css.td}>{pr?.name||"—"}</td>
+                    <td style={css.td}>{fmt(o.plannedQty)}</td>
+                    <td style={css.td}><Badge status={o.status}/></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={css.card}>
+          <h4 style={{ margin:"0 0 12px", fontSize:13, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5 }}>Cảnh báo tồn kho</h4>
+          {materials.filter(m=>m.stock<200).length===0 ? <p style={{color:"#475569",fontSize:13}}>Không có cảnh báo</p> :
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {materials.filter(m=>m.stock<200).sort((a,b)=>a.stock-b.stock).slice(0,6).map(m=>(
+                <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 12px", background:"#0a1220", borderRadius:6, borderLeft: m.stock<50 ? "3px solid #ef4444" : "3px solid #f59e0b" }}>
+                  <span style={{ fontSize:13, color:"#cbd5e1" }}>{m.name}</span>
+                  <span style={{ fontSize:12, fontWeight:700, color: m.stock<50 ? "#ef4444" : "#f59e0b", fontFamily:"'JetBrains Mono', monospace" }}>{fmt(m.stock)} {m.unit}</span>
+                </div>
+              ))}
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   PRODUCTS & BOM
+   ══════════════════════════════════════════ */
+const ProductsPage = ({ products, setProducts, materials, currentUser }) => {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name:"", unit:"chai", category:"" });
+  const [bomRows, setBomRows] = useState([]);
+  const [viewBom, setViewBom] = useState(null);
+
+  const canCreate = hasPerm(currentUser, "products.create");
+  const canEdit = hasPerm(currentUser, "products.edit");
+  const canDelete = hasPerm(currentUser, "products.delete");
+
+  const openAdd = () => { setForm({ name:"", unit:"chai", category:"" }); setBomRows([{ materialId:"", qty:"", note:"" }]); setEditing(null); setShowAdd(true); };
+  const openEdit = (p) => { setForm({ name:p.name, unit:p.unit, category:p.category }); setBomRows(p.bom.map(b=>({...b, qty:String(b.qty)}))); setEditing(p.id); setShowAdd(true); };
+
+  const addBomRow = () => setBomRows([...bomRows, { materialId:"", qty:"", note:"" }]);
+  const removeBomRow = (i) => setBomRows(bomRows.filter((_,idx)=>idx!==i));
+  const updateBomRow = (i, field, val) => setBomRows(bomRows.map((r,idx)=>idx===i?{...r,[field]:val}:r));
+
+  const save = () => {
+    if(!form.name || !form.category) return;
+    const cleanBom = bomRows.filter(r=>r.materialId&&r.qty).map(r=>({ materialId:r.materialId, qty:parseFloat(r.qty), note:r.note }));
+    if (editing) {
+      setProducts(products.map(p=>p.id===editing?{...p, name:form.name, unit:form.unit, category:form.category, bom:cleanBom}:p));
+    } else {
+      setProducts([...products, { id:"SP"+uid().toUpperCase().slice(0,5), name:form.name, unit:form.unit, category:form.category, bom:cleanBom }]);
+    }
+    setShowAdd(false);
+  };
+
+  const deleteProduct = (id) => setProducts(products.filter(p=>p.id!==id));
+
+  const matName = (id) => materials.find(m=>m.id===id)?.name || id;
+  const matUnit = (id) => materials.find(m=>m.id===id)?.unit || "";
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:13, color:"#64748b" }}>{products.length} sản phẩm</div>
+        {canCreate && <button onClick={openAdd} style={css.btnP}>+ Thêm sản phẩm</button>}
+      </div>
+
+      <div style={css.card}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr>{["Mã SP","Tên sản phẩm","Đơn vị","Danh mục","Số NVL trong ĐM",""].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {products.map(p=>(
+              <tr key={p.id} style={{ transition:"background .1s" }} onMouseEnter={e=>e.currentTarget.style.background="#0a1525"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <td style={{...css.td, fontWeight:700, color:"#0ea5e9", fontFamily:"'JetBrains Mono', monospace"}}>{p.id}</td>
+                <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{p.name}</td>
+                <td style={css.td}>{p.unit}</td>
+                <td style={css.td}><span style={{ background:"#1e293b", padding:"2px 8px", borderRadius:4, fontSize:11 }}>{p.category}</span></td>
+                <td style={css.td}>{p.bom.length} loại NVL</td>
+                <td style={{...css.td, textAlign:"right", whiteSpace:"nowrap"}}>
+                  <button onClick={()=>setViewBom(p)} style={{...css.btnS, padding:"5px 12px", fontSize:12, marginRight:6}}>Xem ĐM</button>
+                  {canEdit && <button onClick={()=>openEdit(p)} style={{...css.btnP, padding:"5px 12px", fontSize:12, marginRight:6}}>Sửa</button>}
+                  {canDelete && <button onClick={()=>deleteProduct(p.id)} style={{...css.btnD, padding:"5px 12px", fontSize:12}}>Xoá</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal open={!!viewBom} onClose={()=>setViewBom(null)} title={`Định mức: ${viewBom?.name}`} wide>
+        {viewBom && (
+          <div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:16 }}>
+              <div style={{ background:"#0a1220", borderRadius:6, padding:10 }}><div style={{fontSize:11,color:"#64748b"}}>Sản phẩm</div><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{viewBom.name}</div></div>
+              <div style={{ background:"#0a1220", borderRadius:6, padding:10 }}><div style={{fontSize:11,color:"#64748b"}}>Đơn vị</div><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>1 {viewBom.unit}</div></div>
+              <div style={{ background:"#0a1220", borderRadius:6, padding:10 }}><div style={{fontSize:11,color:"#64748b"}}>Số NVL</div><div style={{fontSize:14,fontWeight:600,color:"#e2e8f0"}}>{viewBom.bom.length} loại</div></div>
+            </div>
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+              <thead><tr>{["NVL","Định mức / 1 SP","Đơn vị","Ghi chú"].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {viewBom.bom.map((b,i)=>(
+                  <tr key={i}>
+                    <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{matName(b.materialId)}</td>
+                    <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", color:"#0ea5e9", fontWeight:700}}>{b.qty}</td>
+                    <td style={css.td}>{matUnit(b.materialId)}</td>
+                    <td style={{...css.td, color:"#64748b", fontStyle:"italic"}}>{b.note||"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title={editing?"Sửa sản phẩm":"Thêm sản phẩm mới"} wide>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:18 }}>
+          <Field label="Tên sản phẩm"><input style={css.input} value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></Field>
+          <Field label="Đơn vị">
+            <select style={css.select} value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})}>
+              {["chai","hộp","gói","kg","lon","thùng"].map(u=><option key={u} value={u}>{u}</option>)}
+            </select>
+          </Field>
+          <Field label="Danh mục"><input style={css.input} value={form.category} onChange={e=>setForm({...form,category:e.target.value})} placeholder="VD: Nước giải khát" /></Field>
+        </div>
+
+        <div style={{ marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:13, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5 }}>Định mức NVL (BOM)</span>
+          <button onClick={addBomRow} style={{...css.btnS, padding:"5px 12px", fontSize:12}}>+ Thêm dòng</button>
+        </div>
+        <table style={{ width:"100%", borderCollapse:"collapse", marginBottom:18 }}>
+          <thead><tr>{["Nguyên vật liệu","Định mức / 1 SP","Ghi chú",""].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {bomRows.map((row,i)=>(
+              <tr key={i}>
+                <td style={css.td}>
+                  <select style={{...css.select, width:220}} value={row.materialId} onChange={e=>updateBomRow(i,"materialId",e.target.value)}>
+                    <option value="">-- Chọn NVL --</option>
+                    {materials.map(m=><option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
+                  </select>
+                </td>
+                <td style={css.td}><input type="number" style={{...css.input, width:100}} value={row.qty} onChange={e=>updateBomRow(i,"qty",e.target.value)} placeholder="0" step="any" /></td>
+                <td style={css.td}><input style={{...css.input, width:180}} value={row.note} onChange={e=>updateBomRow(i,"note",e.target.value)} placeholder="Ghi chú" /></td>
+                <td style={css.td}><button onClick={()=>removeBomRow(i)} style={{...css.btnD, padding:"4px 10px", fontSize:11}}>Xoá</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={()=>setShowAdd(false)} style={css.btnS}>Huỷ</button>
+          <button onClick={save} style={css.btnP}>{editing?"Cập nhật":"Tạo sản phẩm"}</button>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   PRODUCTION ORDERS
+   ══════════════════════════════════════════ */
+const OrdersPage = ({ orders, setOrders, products, materials, setMaterials, currentUser }) => {
+  const [showAdd, setShowAdd] = useState(false);
+  const [showComplete, setShowComplete] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [form, setForm] = useState({ productId:"", plannedQty:"", note:"" });
+  const [completeForm, setCompleteForm] = useState({ actualOutput:"", actualMats:[] });
+
+  const canCreate = hasPerm(currentUser, "orders.create");
+  const canManage = hasPerm(currentUser, "orders.manage");
+
+  const filtered = filter==="all" ? orders : orders.filter(o=>o.status===filter);
+
+  const openAdd = () => { setForm({ productId: products[0]?.id||"", plannedQty:"", note:"" }); setShowAdd(true); };
+
+  const createOrder = () => {
+    if(!form.productId||!form.plannedQty) return;
+    const num = String(orders.length+1).padStart(3,"0");
+    setOrders([...orders, {
+      id:`LSX${num}`, productId:form.productId, plannedQty:parseInt(form.plannedQty),
+      status:"pending", createdBy:currentUser.id, createdAt:new Date().toISOString().split("T")[0],
+      completedAt:null, note:form.note, actualMaterials:[], actualOutput:null,
+    }]);
+    setShowAdd(false);
+  };
+
+  const startOrder = (id) => setOrders(orders.map(o=>o.id===id?{...o, status:"processing"}:o));
+
+  const openComplete = (order) => {
+    const prod = products.find(p=>p.id===order.productId);
+    if(!prod) return;
+    const mats = prod.bom.map(b=>({
+      materialId: b.materialId,
+      planned: Math.round(b.qty * order.plannedQty * 1000) / 1000,
+      actual: "",
+    }));
+    setCompleteForm({ actualOutput:"", actualMats:mats });
+    setShowComplete(order);
+  };
+
+  const confirmComplete = () => {
+    if(!showComplete || !completeForm.actualOutput) return;
+    const actualMats = completeForm.actualMats.map(m=>({
+      materialId: m.materialId,
+      planned: m.planned,
+      actual: parseFloat(m.actual) || m.planned,
+    }));
+    const updatedMats = [...materials];
+    actualMats.forEach(am => {
+      const idx = updatedMats.findIndex(m=>m.id===am.materialId);
+      if(idx>=0) updatedMats[idx] = { ...updatedMats[idx], stock: Math.max(0, updatedMats[idx].stock - am.actual) };
+    });
+    setMaterials(updatedMats);
+    setOrders(orders.map(o=>o.id===showComplete.id?{
+      ...o, status:"completed", completedAt:new Date().toISOString().split("T")[0],
+      actualOutput: parseInt(completeForm.actualOutput), actualMaterials: actualMats,
+    }:o));
+    setShowComplete(null);
+  };
+
+  const matName = (id) => materials.find(m=>m.id===id)?.name || id;
+  const matUnit = (id) => materials.find(m=>m.id===id)?.unit || "";
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ display:"flex", gap:4 }}>
+          {[{v:"all",l:"Tất cả"},{v:"pending",l:"Chờ SX"},{v:"processing",l:"Đang SX"},{v:"completed",l:"Hoàn thành"}].map(f=>(
+            <button key={f.v} onClick={()=>setFilter(f.v)} style={{
+              ...css.btnS, padding:"6px 14px", fontSize:12,
+              background: filter===f.v ? "#0ea5e9" : "transparent",
+              color: filter===f.v ? "#fff" : "#64748b",
+              borderColor: filter===f.v ? "#0ea5e9" : "#2a3a4a",
+            }}>{f.l}</button>
+          ))}
+        </div>
+        {canCreate && <button onClick={openAdd} style={css.btnP}>+ Lập lệnh SX</button>}
+      </div>
+
+      <div style={css.card}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr>{["Mã LSX","Sản phẩm","SL kế hoạch","SL thực tế","Ngày tạo","Trạng thái","Ghi chú",""].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {filtered.map(o=>{
+              const pr = products.find(p=>p.id===o.productId);
+              return (
+                <tr key={o.id} onMouseEnter={e=>e.currentTarget.style.background="#0a1525"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <td style={{...css.td, fontWeight:700, color:"#0ea5e9", fontFamily:"'JetBrains Mono', monospace"}}>{o.id}</td>
+                  <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{pr?.name||"—"}</td>
+                  <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace"}}>{fmt(o.plannedQty)} {pr?.unit}</td>
+                  <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", color: o.actualOutput ? "#10b981" : "#475569"}}>{o.actualOutput ? fmt(o.actualOutput)+" "+pr?.unit : "—"}</td>
+                  <td style={{...css.td, fontSize:12}}>{o.createdAt}</td>
+                  <td style={css.td}><Badge status={o.status}/></td>
+                  <td style={{...css.td, fontSize:12, color:"#64748b", maxWidth:150, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{o.note||"—"}</td>
+                  <td style={{...css.td, textAlign:"right", whiteSpace:"nowrap"}}>
+                    {canManage && o.status==="pending" && <button onClick={()=>startOrder(o.id)} style={{...css.btnP, padding:"5px 12px", fontSize:12, background:"#f59e0b"}}>Bắt đầu SX</button>}
+                    {canManage && o.status==="processing" && <button onClick={()=>openComplete(o)} style={{...css.btnP, padding:"5px 12px", fontSize:12, background:"#10b981"}}>Hoàn thành</button>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {filtered.length===0 && <div style={{textAlign:"center",padding:30,color:"#475569",fontSize:13}}>Không có lệnh sản xuất nào</div>}
+      </div>
+
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="Lập lệnh sản xuất mới">
+        <Field label="Sản phẩm">
+          <select style={css.select} value={form.productId} onChange={e=>setForm({...form,productId:e.target.value})}>
+            {products.map(p=><option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
+          </select>
+        </Field>
+        {form.productId && (
+          <div style={{ background:"#0a1220", borderRadius:6, padding:12, marginBottom:14, fontSize:12, color:"#64748b" }}>
+            <b style={{color:"#94a3b8"}}>Định mức cho 1 {products.find(p=>p.id===form.productId)?.unit}:</b>
+            {products.find(p=>p.id===form.productId)?.bom.map((b,i)=>(
+              <div key={i} style={{marginTop:3}}>• {matName(b.materialId)}: <span style={{color:"#0ea5e9"}}>{b.qty} {matUnit(b.materialId)}</span></div>
+            ))}
+          </div>
+        )}
+        <Field label="Số lượng sản xuất">
+          <input type="number" style={css.input} value={form.plannedQty} onChange={e=>setForm({...form,plannedQty:e.target.value})} placeholder="VD: 1000" />
+        </Field>
+        {form.productId && form.plannedQty && parseInt(form.plannedQty)>0 && (
+          <div style={{ background:"#0c1a12", border:"1px solid #1a3a2a", borderRadius:6, padding:12, marginBottom:14, fontSize:12 }}>
+            <b style={{color:"#10b981"}}>Tổng NVL cần cho {fmt(parseInt(form.plannedQty))} {products.find(p=>p.id===form.productId)?.unit}:</b>
+            {products.find(p=>p.id===form.productId)?.bom.map((b,i)=>{
+              const need = b.qty * parseInt(form.plannedQty);
+              const mat = materials.find(m=>m.id===b.materialId);
+              const enough = mat && mat.stock >= need;
+              return (
+                <div key={i} style={{marginTop:3, color: enough ? "#a7f3d0" : "#fca5a5"}}>
+                  • {matName(b.materialId)}: {fmt(Math.round(need*100)/100)} {matUnit(b.materialId)}
+                  {mat && <span style={{color:"#64748b"}}> (kho: {fmt(mat.stock)}) </span>}
+                  {!enough && <span style={{color:"#ef4444", fontWeight:700}}>⚠ THIẾU</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <Field label="Ghi chú"><input style={css.input} value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="VD: Đơn VinMart tháng 5" /></Field>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
+          <button onClick={()=>setShowAdd(false)} style={css.btnS}>Huỷ</button>
+          <button onClick={createOrder} style={css.btnP}>Tạo lệnh SX</button>
+        </div>
+      </Modal>
+
+      <Modal open={!!showComplete} onClose={()=>setShowComplete(null)} title={`Hoàn thành: ${showComplete?.id}`} wide>
+        {showComplete && (
+          <div>
+            <div style={{ background:"#0a1220", borderRadius:6, padding:12, marginBottom:16, fontSize:13, color:"#94a3b8" }}>
+              Sản phẩm: <b style={{color:"#e2e8f0"}}>{products.find(p=>p.id===showComplete.productId)?.name}</b> — Kế hoạch: <b style={{color:"#0ea5e9"}}>{fmt(showComplete.plannedQty)}</b>
+            </div>
+            <Field label="Sản lượng thực tế (output)">
+              <input type="number" style={css.input} value={completeForm.actualOutput} onChange={e=>setCompleteForm({...completeForm,actualOutput:e.target.value})} placeholder={`VD: ${showComplete.plannedQty}`} />
+            </Field>
+            <div style={{ fontSize:13, fontWeight:700, color:"#94a3b8", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>NVL tiêu hao thực tế</div>
+            <table style={{ width:"100%", borderCollapse:"collapse", marginBottom:16 }}>
+              <thead><tr>{["NVL","Theo định mức","Thực tế sử dụng","Đơn vị"].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {completeForm.actualMats.map((m,i)=>(
+                  <tr key={i}>
+                    <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{matName(m.materialId)}</td>
+                    <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", color:"#64748b"}}>{fmt(Math.round(m.planned*100)/100)}</td>
+                    <td style={css.td}>
+                      <input type="number" style={{...css.input, width:120}} value={m.actual}
+                        onChange={e=>{
+                          const upd = [...completeForm.actualMats];
+                          upd[i] = {...upd[i], actual:e.target.value};
+                          setCompleteForm({...completeForm, actualMats:upd});
+                        }} placeholder={String(Math.round(m.planned*100)/100)} step="any" />
+                    </td>
+                    <td style={css.td}>{matUnit(m.materialId)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={()=>setShowComplete(null)} style={css.btnS}>Huỷ</button>
+              <button onClick={confirmComplete} style={{...css.btnP, background:"#10b981"}}>Xác nhận hoàn thành</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   BOM vs ACTUAL COMPARISON
+   ══════════════════════════════════════════ */
+const ComparePage = ({ orders, products, materials }) => {
+  const [selected, setSelected] = useState(null);
+  const completedOrders = orders.filter(o=>o.status==="completed"&&o.actualMaterials.length>0);
+
+  const matName = (id) => materials.find(m=>m.id===id)?.name || id;
+  const matUnit = (id) => materials.find(m=>m.id===id)?.unit || "";
+
+  const analysis = useMemo(()=>{
+    if(!selected) return null;
+    const order = completedOrders.find(o=>o.id===selected);
+    if(!order) return null;
+    const prod = products.find(p=>p.id===order.productId);
+    if(!prod) return null;
+
+    const outputEfficiency = order.actualOutput / order.plannedQty * 100;
+    const rows = order.actualMaterials.map(am => {
+      const bomItem = prod.bom.find(b=>b.materialId===am.materialId);
+      const plannedPerUnit = bomItem ? bomItem.qty : 0;
+      const totalPlanned = am.planned;
+      const totalActual = am.actual;
+      const diff = totalActual - totalPlanned;
+      const diffPercent = totalPlanned > 0 ? (diff / totalPlanned * 100) : 0;
+      const actualPerUnit = order.actualOutput > 0 ? totalActual / order.actualOutput : 0;
+      const costPerUnit = (materials.find(m=>m.id===am.materialId)?.price||0);
+      const wastedCost = diff > 0 ? diff * costPerUnit : 0;
+      return {
+        materialId: am.materialId, plannedPerUnit,
+        actualPerUnit: Math.round(actualPerUnit*10000)/10000,
+        totalPlanned, totalActual, diff,
+        diffPercent: Math.round(diffPercent*100)/100,
+        costPerUnit, wastedCost,
+        status: Math.abs(diffPercent) <= 2 ? "good" : diffPercent > 0 ? "over" : "under",
+      };
+    });
+    const totalWastedCost = rows.reduce((s,r)=>s+r.wastedCost,0);
+    return { order, prod, rows, outputEfficiency: Math.round(outputEfficiency*100)/100, totalWastedCost };
+  }, [selected, completedOrders, products, materials]);
+
+  return (
+    <div>
+      <div style={{ ...css.card, marginBottom:20 }}>
+        <Field label="Chọn lệnh sản xuất đã hoàn thành">
+          <select style={css.select} value={selected||""} onChange={e=>setSelected(e.target.value||null)}>
+            <option value="">-- Chọn lệnh SX --</option>
+            {completedOrders.map(o=>{
+              const pr = products.find(p=>p.id===o.productId);
+              return <option key={o.id} value={o.id}>{o.id} — {pr?.name} — KH: {fmt(o.plannedQty)} — TT: {fmt(o.actualOutput)} ({o.completedAt})</option>;
+            })}
+          </select>
+        </Field>
+      </div>
+
+      {analysis && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16, animation:"fadeUp .3s ease" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))", gap:12 }}>
+            <StatCard icon="◆" label="Mã lệnh" value={analysis.order.id} accent="#0ea5e9" />
+            <StatCard icon="📋" label="KH / Thực tế" value={`${fmt(analysis.order.plannedQty)} / ${fmt(analysis.order.actualOutput)}`} accent="#8b5cf6" />
+            <StatCard icon="📈" label="Hiệu suất output" value={`${analysis.outputEfficiency}%`} accent={analysis.outputEfficiency>=98?"#10b981":"#f59e0b"} />
+            <StatCard icon="💸" label="Chi phí hao hụt" value={analysis.totalWastedCost>0?fmtC(analysis.totalWastedCost):"0đ"} accent={analysis.totalWastedCost>0?"#ef4444":"#10b981"} />
+          </div>
+
+          <div style={css.card}>
+            <h4 style={{ margin:"0 0 14px", fontSize:13, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5 }}>Chi tiết đối chiếu NVL</h4>
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", minWidth:900 }}>
+                <thead>
+                  <tr>
+                    {["NVL","ĐM/1SP","TT/1SP","Tổng ĐM","Tổng TT","Chênh lệch","% Lệch","Đơn giá","Chi phí lệch","Đánh giá"].map(h=>
+                      <th key={h} style={css.th}>{h}</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysis.rows.map((r,i)=>(
+                    <tr key={i} style={{ background: r.status==="over" ? "rgba(239,68,68,0.05)" : r.status==="under" ? "rgba(16,185,129,0.05)" : "transparent" }}>
+                      <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{matName(r.materialId)}</td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace"}}>{r.plannedPerUnit} {matUnit(r.materialId)}</td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", color: r.status==="over"?"#f87171":r.status==="under"?"#34d399":"#e2e8f0" }}>{r.actualPerUnit} {matUnit(r.materialId)}</td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace"}}>{fmt(Math.round(r.totalPlanned*100)/100)}</td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", fontWeight:700}}>{fmt(Math.round(r.totalActual*100)/100)}</td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", fontWeight:700, color: r.diff>0?"#ef4444":r.diff<0?"#10b981":"#64748b" }}>
+                        {r.diff>0?"+":""}{fmt(Math.round(r.diff*100)/100)} {matUnit(r.materialId)}
+                      </td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", fontWeight:700, color: Math.abs(r.diffPercent)<=2?"#10b981":r.diffPercent>0?"#ef4444":"#f59e0b" }}>
+                        {r.diffPercent>0?"+":""}{r.diffPercent}%
+                      </td>
+                      <td style={{...css.td, fontSize:12}}>{fmtC(r.costPerUnit)}</td>
+                      <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", fontWeight:700, color: r.wastedCost>0?"#ef4444":"#10b981"}}>
+                        {r.wastedCost>0 ? "+"+fmtC(r.wastedCost) : "0đ"}
+                      </td>
+                      <td style={css.td}>
+                        {r.status==="good" && <span style={{background:"#064e3b",color:"#6ee7b7",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:600}}>✓ Đạt</span>}
+                        {r.status==="over" && <span style={{background:"#450a0a",color:"#fca5a5",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:600}}>▲ Vượt ĐM</span>}
+                        {r.status==="under" && <span style={{background:"#052e16",color:"#86efac",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:600}}>▼ Tiết kiệm</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop:"2px solid #1e2d3d" }}>
+                    <td colSpan={8} style={{...css.td, fontWeight:700, color:"#e2e8f0", textAlign:"right"}}>Tổng chi phí hao hụt:</td>
+                    <td style={{...css.td, fontWeight:800, fontSize:15, color: analysis.totalWastedCost>0?"#ef4444":"#10b981", fontFamily:"'JetBrains Mono', monospace" }}>
+                      {analysis.totalWastedCost>0 ? "+"+fmtC(analysis.totalWastedCost) : "0đ"}
+                    </td>
+                    <td style={css.td}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <div style={css.card}>
+            <h4 style={{ margin:"0 0 14px", fontSize:13, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:0.5 }}>Biểu đồ so sánh % lệch ĐM</h4>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {analysis.rows.map((r,i)=>{
+                const maxAbs = Math.max(...analysis.rows.map(x=>Math.abs(x.diffPercent)), 5);
+                const barWidth = Math.abs(r.diffPercent) / maxAbs * 45;
+                return (
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <div style={{ width:140, fontSize:12, color:"#94a3b8", textAlign:"right", flexShrink:0 }}>{matName(r.materialId)}</div>
+                    <div style={{ flex:1, display:"flex", alignItems:"center", height:24, position:"relative" }}>
+                      <div style={{ position:"absolute", left:"50%", top:0, bottom:0, width:1, background:"#1e2d3d" }} />
+                      {r.diffPercent >= 0 ? (
+                        <div style={{ marginLeft:"50%", width:`${barWidth}%`, height:18, borderRadius:"0 4px 4px 0", background: r.diffPercent<=2?"#059669":"#dc2626", transition:"width .5s ease" }} />
+                      ) : (
+                        <div style={{ marginLeft:`${50-barWidth}%`, width:`${barWidth}%`, height:18, borderRadius:"4px 0 0 4px", background:"#0ea5e9", transition:"width .5s ease" }} />
+                      )}
+                    </div>
+                    <div style={{ width:60, fontSize:12, fontWeight:700, color: r.diffPercent>2?"#ef4444":r.diffPercent<-2?"#0ea5e9":"#10b981", fontFamily:"'JetBrains Mono', monospace", flexShrink:0 }}>
+                      {r.diffPercent>0?"+":""}{r.diffPercent}%
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display:"flex", justifyContent:"center", gap:20, marginTop:14, fontSize:11, color:"#475569" }}>
+              <span>◀ Tiết kiệm</span><span>|</span><span>Vượt ĐM ▶</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!selected && (
+        <div style={{ ...css.card, textAlign:"center", padding:50, color:"#475569" }}>
+          <div style={{ fontSize:40, marginBottom:10 }}>◫</div>
+          <div style={{ fontSize:14 }}>Chọn một lệnh sản xuất đã hoàn thành để xem đối chiếu định mức</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   INVENTORY
+   ══════════════════════════════════════════ */
+const InventoryPage = ({ materials, setMaterials, currentUser }) => {
+  const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(null);
+  const [importQty, setImportQty] = useState("");
+  const [form, setForm] = useState({ name:"", unit:"kg", stock:"", price:"", supplier:"" });
+
+  const canCreate = hasPerm(currentUser, "inventory.create");
+  const canImport = hasPerm(currentUser, "inventory.import");
+
+  const addMat = () => {
+    if(!form.name||!form.stock) return;
+    setMaterials([...materials, { id:"NVL"+uid().toUpperCase().slice(0,5), name:form.name, unit:form.unit, stock:parseFloat(form.stock), price:parseInt(form.price)||0, supplier:form.supplier }]);
+    setForm({ name:"", unit:"kg", stock:"", price:"", supplier:"" }); setShowAdd(false);
+  };
+
+  const doImport = () => {
+    if(!importQty||!showImport) return;
+    setMaterials(materials.map(m=>m.id===showImport.id?{...m, stock:m.stock+parseFloat(importQty)}:m));
+    setImportQty(""); setShowImport(null);
+  };
+
+  const totalValue = materials.reduce((s,m)=>s+m.stock*m.price,0);
+
+  return (
+    <div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:12, marginBottom:18 }}>
+        <StatCard icon="▣" label="Tổng loại NVL" value={materials.length} accent="#0ea5e9" />
+        <StatCard icon="💰" label="Giá trị tồn kho" value={fmtC(totalValue)} accent="#10b981" />
+        <StatCard icon="⚠" label="Tồn kho thấp (<100)" value={materials.filter(m=>m.stock<100).length} accent="#ef4444" />
+      </div>
+
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12, gap:8 }}>
+        {canCreate && <button onClick={()=>setShowAdd(true)} style={css.btnP}>+ Thêm NVL</button>}
+      </div>
+
+      <div style={css.card}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr>{["Mã NVL","Tên","Tồn kho","Đơn giá","Giá trị","Nhà cung cấp",""].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {materials.map(m=>(
+              <tr key={m.id} onMouseEnter={e=>e.currentTarget.style.background="#0a1525"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <td style={{...css.td, fontWeight:700, color:"#0ea5e9", fontFamily:"'JetBrains Mono', monospace"}}>{m.id}</td>
+                <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{m.name}</td>
+                <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", fontWeight:700, color: m.stock<100?"#ef4444":"#e2e8f0"}}>{fmt(m.stock)} {m.unit} {m.stock<100&&"⚠"}</td>
+                <td style={{...css.td, fontSize:12}}>{fmtC(m.price)}/{m.unit}</td>
+                <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace"}}>{fmtC(m.stock*m.price)}</td>
+                <td style={{...css.td, fontSize:12, color:"#64748b"}}>{m.supplier}</td>
+                <td style={{...css.td, textAlign:"right"}}>
+                  {canImport && <button onClick={()=>{setShowImport(m);setImportQty("");}} style={{...css.btnP, padding:"5px 12px", fontSize:12, background:"#10b981"}}>Nhập kho</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="Thêm NVL mới">
+        {[{l:"Tên NVL",k:"name",t:"text"},{l:"Tồn kho",k:"stock",t:"number"},{l:"Đơn giá (VNĐ)",k:"price",t:"number"},{l:"Nhà cung cấp",k:"supplier",t:"text"}].map(f=>(
+          <Field key={f.k} label={f.l}><input type={f.t} style={css.input} value={form[f.k]} onChange={e=>setForm({...form,[f.k]:e.target.value})} /></Field>
+        ))}
+        <Field label="Đơn vị">
+          <select style={css.select} value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})}>
+            {["kg","lít","cái","gói","thùng","hộp","tấn"].map(u=><option key={u}>{u}</option>)}
+          </select>
+        </Field>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:12 }}>
+          <button onClick={()=>setShowAdd(false)} style={css.btnS}>Huỷ</button>
+          <button onClick={addMat} style={css.btnP}>Thêm</button>
+        </div>
+      </Modal>
+
+      <Modal open={!!showImport} onClose={()=>setShowImport(null)} title={`Nhập kho: ${showImport?.name}`}>
+        <div style={{ background:"#0a1220", borderRadius:6, padding:12, marginBottom:14, fontSize:13, color:"#94a3b8" }}>
+          Tồn kho hiện tại: <b style={{color:"#e2e8f0"}}>{showImport&&fmt(showImport.stock)} {showImport?.unit}</b>
+        </div>
+        <Field label="Số lượng nhập">
+          <input type="number" style={css.input} value={importQty} onChange={e=>setImportQty(e.target.value)} placeholder="Nhập số lượng" />
+        </Field>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
+          <button onClick={()=>setShowImport(null)} style={css.btnS}>Huỷ</button>
+          <button onClick={doImport} style={{...css.btnP, background:"#10b981"}}>Xác nhận</button>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   USER MANAGEMENT & PERMISSIONS
+   ══════════════════════════════════════════ */
+const UsersPage = ({ users, setUsers, currentUser }) => {
+  const [showAdd, setShowAdd] = useState(false);
+  const [showReset, setShowReset] = useState(null);
+  const [showPerms, setShowPerms] = useState(null);
+  const [newPw, setNewPw] = useState("");
+  const [form, setForm] = useState({ username:"", password:"", fullName:"", role:"worker" });
+  const [editPerms, setEditPerms] = useState([]);
+
+  const canCreate = hasPerm(currentUser, "users.create");
+  const canEdit = hasPerm(currentUser, "users.edit");
+
+  const addUser = () => {
+    if(!form.username||!form.password||!form.fullName) return;
+    if(users.find(u=>u.username===form.username)) return;
+    const perms = [...(PRESET_ROLES[form.role] || PRESET_ROLES.worker)];
+    setUsers([...users, {
+      id:"U"+uid().toUpperCase().slice(0,5), username:form.username, password:form.password,
+      fullName:form.fullName, role:form.role, permissions:perms,
+      created:new Date().toISOString().split("T")[0]
+    }]);
+    setForm({ username:"", password:"", fullName:"", role:"worker" }); setShowAdd(false);
+  };
+
+  const resetPw = () => {
+    if(!newPw||!showReset) return;
+    setUsers(users.map(u=>u.id===showReset.id?{...u, password:newPw}:u));
+    setNewPw(""); setShowReset(null);
+  };
+
+  const deleteUser = (id) => {
+    if(id===currentUser.id) return;
+    setUsers(users.filter(u=>u.id!==id));
+  };
+
+  const openPerms = (user) => {
+    setEditPerms([...(user.permissions||[])]);
+    setShowPerms(user);
+  };
+
+  const togglePerm = (permId) => {
+    setEditPerms(prev => prev.includes(permId) ? prev.filter(p=>p!==permId) : [...prev, permId]);
+  };
+
+  const applyPreset = (role) => {
+    setEditPerms([...(PRESET_ROLES[role] || [])]);
+  };
+
+  const savePerms = () => {
+    if(!showPerms) return;
+    setUsers(users.map(u=>u.id===showPerms.id?{...u, permissions:[...editPerms]}:u));
+    setShowPerms(null);
+  };
+
+  const permModules = useMemo(()=>{
+    const mods = {};
+    ALL_PERMISSIONS.forEach(p=>{
+      if(!mods[p.module]) mods[p.module] = [];
+      mods[p.module].push(p);
+    });
+    return mods;
+  },[]);
+
+  const moduleColors = { "Tổng quan":"#0ea5e9", "Sản phẩm":"#8b5cf6", "Lệnh SX":"#f59e0b", "Đối chiếu":"#06b6d4", "Kho NVL":"#10b981", "Tài khoản":"#f43f5e" };
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:13, color:"#64748b" }}>{users.length} tài khoản</div>
+        {canCreate && <button onClick={()=>setShowAdd(true)} style={css.btnP}>+ Tạo tài khoản</button>}
+      </div>
+
+      <div style={css.card}>
+        <table style={{ width:"100%", borderCollapse:"collapse" }}>
+          <thead><tr>{["Mã","Tên đăng nhập","Họ tên","Vai trò","Quyền","Ngày tạo",""].map(h=><th key={h} style={css.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {users.map(u=>(
+              <tr key={u.id} onMouseEnter={e=>e.currentTarget.style.background="#0a1525"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace", fontWeight:700, color:"#0ea5e9"}}>{u.id}</td>
+                <td style={{...css.td, fontWeight:600, color:"#e2e8f0"}}>{u.username} {u.id===currentUser.id&&<span style={{fontSize:10,color:"#64748b"}}>(bạn)</span>}</td>
+                <td style={css.td}>{u.fullName}</td>
+                <td style={css.td}><RoleBadge role={u.role}/></td>
+                <td style={css.td}>
+                  <span style={{ fontSize:11, color:"#64748b", fontFamily:"'JetBrains Mono', monospace" }}>
+                    {(u.permissions||[]).length}/{ALL_PERMISSIONS.length} quyền
+                  </span>
+                </td>
+                <td style={{...css.td, fontSize:12}}>{u.created}</td>
+                <td style={{...css.td, textAlign:"right", whiteSpace:"nowrap"}}>
+                  {canEdit && (
+                    <>
+                      <button onClick={()=>openPerms(u)} style={{...css.btnP, padding:"5px 10px", fontSize:11, marginRight:6, background:"#8b5cf6"}}>Phân quyền</button>
+                      <button onClick={()=>{setShowReset(u);setNewPw("");}} style={{...css.btnS, padding:"5px 10px", fontSize:11, marginRight:6}}>Đổi MK</button>
+                      {u.id!==currentUser.id && <button onClick={()=>deleteUser(u.id)} style={{...css.btnD, padding:"5px 10px", fontSize:11}}>Xoá</button>}
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create user modal */}
+      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="Tạo tài khoản mới">
+        <Field label="Tên đăng nhập"><input style={css.input} value={form.username} onChange={e=>setForm({...form,username:e.target.value})} /></Field>
+        <Field label="Mật khẩu"><input style={css.input} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} /></Field>
+        <Field label="Họ tên"><input style={css.input} value={form.fullName} onChange={e=>setForm({...form,fullName:e.target.value})} /></Field>
+        <Field label="Vai trò (quyền mặc định theo vai trò)">
+          <select style={css.select} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
+            <option value="admin">Quản trị viên — Toàn quyền</option>
+            <option value="manager">Quản lý — Quản lý SX, kho, sản phẩm</option>
+            <option value="worker">Công nhân — Chỉ xem</option>
+          </select>
+        </Field>
+        <div style={{ background:"#0a1220", borderRadius:6, padding:12, marginBottom:14, fontSize:12, color:"#64748b" }}>
+          <b style={{color:"#94a3b8"}}>Quyền mặc định cho {ROLES[form.role]}:</b>
+          <div style={{ marginTop:6, display:"flex", flexWrap:"wrap", gap:4 }}>
+            {(PRESET_ROLES[form.role]||[]).map(p=>{
+              const perm = ALL_PERMISSIONS.find(x=>x.id===p);
+              return perm ? <span key={p} style={{ background:"#1e293b", padding:"2px 6px", borderRadius:3, fontSize:10, color:"#94a3b8" }}>{perm.label}</span> : null;
+            })}
+          </div>
+          <div style={{ marginTop:6, fontSize:11, color:"#475569" }}>Sau khi tạo, bạn có thể tuỳ chỉnh quyền chi tiết qua nút "Phân quyền"</div>
+        </div>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:12 }}>
+          <button onClick={()=>setShowAdd(false)} style={css.btnS}>Huỷ</button>
+          <button onClick={addUser} style={css.btnP}>Tạo tài khoản</button>
+        </div>
+      </Modal>
+
+      {/* Reset password modal */}
+      <Modal open={!!showReset} onClose={()=>setShowReset(null)} title={`Đổi mật khẩu: ${showReset?.fullName}`}>
+        <Field label="Mật khẩu mới"><input style={css.input} value={newPw} onChange={e=>setNewPw(e.target.value)} /></Field>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:12 }}>
+          <button onClick={()=>setShowReset(null)} style={css.btnS}>Huỷ</button>
+          <button onClick={resetPw} style={css.btnP}>Cập nhật</button>
+        </div>
+      </Modal>
+
+      {/* Permissions modal */}
+      <Modal open={!!showPerms} onClose={()=>setShowPerms(null)} title={`Phân quyền: ${showPerms?.fullName}`} wide>
+        {showPerms && (
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+              <span style={{ fontSize:12, color:"#64748b", marginRight:4 }}>Áp dụng nhanh:</span>
+              {Object.entries(ROLES).map(([k,v])=>(
+                <button key={k} onClick={()=>applyPreset(k)} style={{...css.btnS, padding:"4px 12px", fontSize:11}}>
+                  {v}
+                </button>
+              ))}
+              <button onClick={()=>setEditPerms(ALL_PERMISSIONS.map(p=>p.id))} style={{...css.btnS, padding:"4px 12px", fontSize:11, borderColor:"#0ea5e9", color:"#0ea5e9"}}>
+                Toàn quyền
+              </button>
+              <button onClick={()=>setEditPerms([])} style={{...css.btnS, padding:"4px 12px", fontSize:11, borderColor:"#dc2626", color:"#f87171"}}>
+                Bỏ tất cả
+              </button>
+              <span style={{ marginLeft:"auto", fontSize:12, color:"#64748b", fontFamily:"'JetBrains Mono', monospace" }}>
+                {editPerms.length}/{ALL_PERMISSIONS.length}
+              </span>
+            </div>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              {Object.entries(permModules).map(([mod, perms])=>{
+                const allChecked = perms.every(p=>editPerms.includes(p.id));
+                const modColor = moduleColors[mod] || "#64748b";
+                return (
+                  <div key={mod} style={{ background:"#0a1220", borderRadius:8, border:"1px solid #1a2535", overflow:"hidden" }}>
+                    <div style={{
+                      padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between",
+                      borderBottom:"1px solid #1a2535", background:"rgba(0,0,0,0.2)"
+                    }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <div style={{ width:8, height:8, borderRadius:2, background:modColor }} />
+                        <span style={{ fontSize:13, fontWeight:700, color:"#e2e8f0" }}>{mod}</span>
+                        <span style={{ fontSize:11, color:"#475569" }}>({perms.filter(p=>editPerms.includes(p.id)).length}/{perms.length})</span>
+                      </div>
+                      <button onClick={()=>{
+                        if(allChecked) setEditPerms(editPerms.filter(id=>!perms.find(p=>p.id===id)));
+                        else setEditPerms([...new Set([...editPerms, ...perms.map(p=>p.id)])]);
+                      }} style={{...css.btnS, padding:"3px 10px", fontSize:10}}>
+                        {allChecked ? "Bỏ tất cả" : "Chọn tất cả"}
+                      </button>
+                    </div>
+                    <div style={{ padding:"8px 14px" }}>
+                      {perms.map(p=>(
+                        <div key={p.id} style={{
+                          display:"flex", alignItems:"center", justifyContent:"space-between",
+                          padding:"7px 0", borderBottom:"1px solid #111d2e"
+                        }}>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:500, color: editPerms.includes(p.id) ? "#e2e8f0" : "#475569" }}>{p.label}</div>
+                            <div style={{ fontSize:11, color:"#3e4c5e", marginTop:1 }}>{p.desc}</div>
+                          </div>
+                          <PermToggle
+                            checked={editPerms.includes(p.id)}
+                            onChange={()=>togglePerm(p.id)}
+                            disabled={showPerms.id===currentUser.id && (p.id==="users.view"||p.id==="users.edit")}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:18 }}>
+              <button onClick={()=>setShowPerms(null)} style={css.btnS}>Huỷ</button>
+              <button onClick={savePerms} style={{...css.btnP, background:"#8b5cf6"}}>Lưu phân quyền</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════
+   MAIN APP
+   ══════════════════════════════════════════ */
+function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [users, setUsers] = useState(INITIAL_USERS);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [materials, setMaterials] = useState(INITIAL_MATERIALS);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(()=>{
+    if(currentUser) {
+      const updated = users.find(u=>u.id===currentUser.id);
+      if(updated && JSON.stringify(updated.permissions)!==JSON.stringify(currentUser.permissions)){
+        setCurrentUser(updated);
+      }
+    }
+  },[users]);
+
+  if (!currentUser) return <LoginScreen users={users} onLogin={setCurrentUser} />;
+
+  const visibleTabs = getVisibleTabs(currentUser);
+  if(visibleTabs.length>0 && !visibleTabs.find(t=>t.id===activeTab)){
+    setTimeout(()=>setActiveTab(visibleTabs[0]?.id||"dashboard"),0);
+  }
+
+  const pages = {
+    dashboard: <DashboardPage products={products} orders={orders} materials={materials} />,
+    products: <ProductsPage products={products} setProducts={setProducts} materials={materials} currentUser={currentUser} />,
+    orders: <OrdersPage orders={orders} setOrders={setOrders} products={products} materials={materials} setMaterials={setMaterials} currentUser={currentUser} />,
+    compare: <ComparePage orders={orders} products={products} materials={materials} />,
+    inventory: <InventoryPage materials={materials} setMaterials={setMaterials} currentUser={currentUser} />,
+    users: <UsersPage users={users} setUsers={setUsers} currentUser={currentUser} />,
+  };
+
+  return (
+    <div style={{ fontFamily:"'DM Sans', sans-serif", background:"#080e18", minHeight:"100vh", display:"flex", color:"#cbd5e1" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+        @keyframes mdIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        *{box-sizing:border-box} ::-webkit-scrollbar{width:4px;height:4px} ::-webkit-scrollbar-thumb{background:#1e2d3d;border-radius:99px} ::-webkit-scrollbar-track{background:transparent}
+      `}</style>
+
+      {/* Sidebar */}
+      <div style={{
+        width: sidebarCollapsed ? 60 : 240, background:"#0b1120", borderRight:"1px solid #1a2535",
+        display:"flex", flexDirection:"column", flexShrink:0, transition:"width .2s ease", overflow:"hidden"
+      }}>
+        <div style={{ padding: sidebarCollapsed ? "16px 10px" : "14px 18px", borderBottom:"1px solid #1a2535", display:"flex", alignItems:"center", justifyContent:"space-between", minHeight:56 }}>
+          {!sidebarCollapsed && (
+            <div style={{ whiteSpace:"nowrap", overflow:"hidden" }}>
+              <div style={{ fontSize:14, fontWeight:800, color:"#0ea5e9", letterSpacing:-0.3, lineHeight:1.2 }}>{APP_NAME}</div>
+              <div style={{ fontSize:11, fontWeight:700, color:"#38bdf8", letterSpacing:0.5 }}>{APP_SUB}</div>
+            </div>
+          )}
+          <button onClick={()=>setSidebarCollapsed(!sidebarCollapsed)} style={{ background:"none", border:"none", color:"#475569", cursor:"pointer", fontSize:16, padding:4, flexShrink:0 }}>{sidebarCollapsed?"▶":"◀"}</button>
+        </div>
+
+        <nav style={{ flex:1, padding:"8px 6px", display:"flex", flexDirection:"column", gap:1 }}>
+          {visibleTabs.map(tab=>(
+            <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{
+              display:"flex", alignItems:"center", gap:10, padding: sidebarCollapsed ? "10px 0" : "10px 12px",
+              justifyContent: sidebarCollapsed ? "center" : "flex-start",
+              borderRadius:6, border:"none", cursor:"pointer", fontSize:13, fontFamily:"inherit",
+              fontWeight: activeTab===tab.id ? 700 : 500,
+              background: activeTab===tab.id ? "rgba(14,165,233,0.1)" : "transparent",
+              color: activeTab===tab.id ? "#0ea5e9" : "#64748b",
+              transition:"all .15s", whiteSpace:"nowrap"
+            }}>
+              <span style={{ fontSize:15, width:20, textAlign:"center", flexShrink:0 }}>{tab.icon}</span>
+              {!sidebarCollapsed && tab.label}
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ padding: sidebarCollapsed ? "12px 6px" : "12px 14px", borderTop:"1px solid #1a2535" }}>
+          {!sidebarCollapsed && (
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#e2e8f0" }}>{currentUser.fullName}</div>
+              <div style={{ marginTop:3 }}><RoleBadge role={currentUser.role} /></div>
+              <div style={{ fontSize:10, color:"#334155", marginTop:2 }}>{(currentUser.permissions||[]).length} quyền</div>
+            </div>
+          )}
+          <button onClick={()=>setCurrentUser(null)} style={{
+            ...css.btnS, width:"100%", padding: sidebarCollapsed ? "6px" : "7px 12px", fontSize:12,
+            textAlign:"center", borderColor:"#2a1a1a", color:"#f87171"
+          }}>{sidebarCollapsed ? "✕" : "Đăng xuất"}</button>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{ flex:1, overflow:"auto" }}>
+        <header style={{
+          padding:"14px 28px", borderBottom:"1px solid #1a2535", display:"flex", justifyContent:"space-between", alignItems:"center",
+          background:"rgba(11,17,32,0.8)", backdropFilter:"blur(10px)", position:"sticky", top:0, zIndex:100,
+        }}>
+          <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:"#e2e8f0", display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ color:"#0ea5e9" }}>{visibleTabs.find(t=>t.id===activeTab)?.icon}</span>
+            {visibleTabs.find(t=>t.id===activeTab)?.label}
+          </h2>
+          <div style={{ fontSize:12, color:"#475569" }}>
+            {new Date().toLocaleDateString("vi-VN",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}
+          </div>
+        </header>
+        <main style={{ padding:24, animation:"fadeUp .3s ease" }}>
+          {pages[activeTab]}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
