@@ -481,8 +481,10 @@ const ProductsPage = ({ products, setProducts, materials, currentUser }) => {
 const OrdersPage = ({ orders, setOrders, products, materials, setMaterials, currentUser }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [showComplete, setShowComplete] = useState(null);
+  const [showEditOrder, setShowEditOrder] = useState(null);
   const [filter, setFilter] = useState("all");
   const [form, setForm] = useState({ productId:"", plannedQty:"", note:"" });
+  const [editOrderForm, setEditOrderForm] = useState({ productId:"", plannedQty:"", note:"" });
   const [completeForm, setCompleteForm] = useState({ actualOutput:"", actualMats:[] });
 
   const canCreate = hasPerm(currentUser, "orders.create");
@@ -491,6 +493,19 @@ const OrdersPage = ({ orders, setOrders, products, materials, setMaterials, curr
   const filtered = filter==="all" ? orders : orders.filter(o=>o.status===filter);
 
   const openAdd = () => { setForm({ productId: products[0]?.id||"", plannedQty:"", note:"" }); setShowAdd(true); };
+
+  const openEditOrder = (o) => {
+    setEditOrderForm({ productId:o.productId, plannedQty:String(o.plannedQty), note:o.note||"" });
+    setShowEditOrder(o);
+  };
+
+  const saveEditOrder = () => {
+    if(!showEditOrder||!editOrderForm.productId||!editOrderForm.plannedQty) return;
+    setOrders(orders.map(o=>o.id===showEditOrder.id?{...o, productId:editOrderForm.productId, plannedQty:parseInt(editOrderForm.plannedQty), note:editOrderForm.note }:o));
+    setShowEditOrder(null);
+  };
+
+  const deleteOrder = (id) => setOrders(orders.filter(o=>o.id!==id));
 
   const createOrder = () => {
     if(!form.productId||!form.plannedQty) return;
@@ -572,8 +587,10 @@ const OrdersPage = ({ orders, setOrders, products, materials, setMaterials, curr
                   <td style={css.td}><Badge status={o.status}/></td>
                   <td style={{...css.td, fontSize:12, color:"#64748b", maxWidth:150, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{o.note||"—"}</td>
                   <td style={{...css.td, textAlign:"right", whiteSpace:"nowrap"}}>
-                    {canManage && o.status==="pending" && <button onClick={()=>startOrder(o.id)} style={{...css.btnP, padding:"5px 12px", fontSize:12, background:"#f59e0b"}}>Bắt đầu SX</button>}
-                    {canManage && o.status==="processing" && <button onClick={()=>openComplete(o)} style={{...css.btnP, padding:"5px 12px", fontSize:12, background:"#10b981"}}>Hoàn thành</button>}
+                    {canManage && o.status==="pending" && <button onClick={()=>openEditOrder(o)} style={{...css.btnS, padding:"5px 10px", fontSize:11, marginRight:4}}>Sửa</button>}
+                    {canManage && o.status==="pending" && <button onClick={()=>startOrder(o.id)} style={{...css.btnP, padding:"5px 10px", fontSize:11, background:"#f59e0b", marginRight:4}}>Bắt đầu SX</button>}
+                    {canManage && o.status==="processing" && <button onClick={()=>openComplete(o)} style={{...css.btnP, padding:"5px 10px", fontSize:11, background:"#10b981", marginRight:4}}>Hoàn thành</button>}
+                    {canManage && (o.status==="pending"||o.status==="cancelled") && <button onClick={()=>deleteOrder(o.id)} style={{...css.btnD, padding:"5px 10px", fontSize:11}}>Xoá</button>}
                   </td>
                 </tr>
               );
@@ -657,6 +674,28 @@ const OrdersPage = ({ orders, setOrders, products, materials, setMaterials, curr
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
               <button onClick={()=>setShowComplete(null)} style={css.btnS}>Huỷ</button>
               <button onClick={confirmComplete} style={{...css.btnP, background:"#10b981"}}>Xác nhận hoàn thành</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!showEditOrder} onClose={()=>setShowEditOrder(null)} title={`Sửa lệnh SX: ${showEditOrder?.id}`}>
+        {showEditOrder && (
+          <div>
+            <Field label="Sản phẩm">
+              <select style={css.select} value={editOrderForm.productId} onChange={e=>setEditOrderForm({...editOrderForm,productId:e.target.value})}>
+                {products.map(p=><option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
+              </select>
+            </Field>
+            <Field label="Số lượng sản xuất">
+              <input type="number" style={css.input} value={editOrderForm.plannedQty} onChange={e=>setEditOrderForm({...editOrderForm,plannedQty:e.target.value})} />
+            </Field>
+            <Field label="Ghi chú">
+              <input style={css.input} value={editOrderForm.note} onChange={e=>setEditOrderForm({...editOrderForm,note:e.target.value})} />
+            </Field>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
+              <button onClick={()=>setShowEditOrder(null)} style={css.btnS}>Huỷ</button>
+              <button onClick={saveEditOrder} style={css.btnP}>Lưu thay đổi</button>
             </div>
           </div>
         )}
@@ -826,17 +865,33 @@ const ComparePage = ({ orders, products, materials }) => {
 const InventoryPage = ({ materials, setMaterials, currentUser }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(null);
+  const [showEdit, setShowEdit] = useState(null);
   const [importQty, setImportQty] = useState("");
   const [form, setForm] = useState({ name:"", unit:"kg", stock:"", price:"", supplier:"" });
+  const [editForm, setEditForm] = useState({ name:"", unit:"kg", stock:"", price:"", supplier:"" });
 
   const canCreate = hasPerm(currentUser, "inventory.create");
   const canImport = hasPerm(currentUser, "inventory.import");
+  const canEdit = hasPerm(currentUser, "inventory.create");
 
   const addMat = () => {
     if(!form.name||!form.stock) return;
     setMaterials([...materials, { id:"NVL"+uid().toUpperCase().slice(0,5), name:form.name, unit:form.unit, stock:parseFloat(form.stock), price:parseInt(form.price)||0, supplier:form.supplier }]);
     setForm({ name:"", unit:"kg", stock:"", price:"", supplier:"" }); setShowAdd(false);
   };
+
+  const openEdit = (m) => {
+    setEditForm({ name:m.name, unit:m.unit, stock:String(m.stock), price:String(m.price), supplier:m.supplier });
+    setShowEdit(m);
+  };
+
+  const saveEdit = () => {
+    if(!showEdit||!editForm.name) return;
+    setMaterials(materials.map(m=>m.id===showEdit.id?{...m, name:editForm.name, unit:editForm.unit, stock:parseFloat(editForm.stock)||0, price:parseInt(editForm.price)||0, supplier:editForm.supplier }:m));
+    setShowEdit(null);
+  };
+
+  const deleteMat = (id) => setMaterials(materials.filter(m=>m.id!==id));
 
   const doImport = () => {
     if(!importQty||!showImport) return;
@@ -870,8 +925,10 @@ const InventoryPage = ({ materials, setMaterials, currentUser }) => {
                 <td style={{...css.td, fontSize:12}}>{fmtC(m.price)}/{m.unit}</td>
                 <td style={{...css.td, fontFamily:"'JetBrains Mono', monospace"}}>{fmtC(m.stock*m.price)}</td>
                 <td style={{...css.td, fontSize:12, color:"#64748b"}}>{m.supplier}</td>
-                <td style={{...css.td, textAlign:"right"}}>
-                  {canImport && <button onClick={()=>{setShowImport(m);setImportQty("");}} style={{...css.btnP, padding:"5px 12px", fontSize:12, background:"#10b981"}}>Nhập kho</button>}
+                <td style={{...css.td, textAlign:"right", whiteSpace:"nowrap"}}>
+                  {canEdit && <button onClick={()=>openEdit(m)} style={{...css.btnS, padding:"5px 10px", fontSize:11, marginRight:4}}>Sửa</button>}
+                  {canImport && <button onClick={()=>{setShowImport(m);setImportQty("");}} style={{...css.btnP, padding:"5px 10px", fontSize:11, background:"#10b981", marginRight:4}}>Nhập kho</button>}
+                  {canEdit && <button onClick={()=>deleteMat(m.id)} style={{...css.btnD, padding:"5px 10px", fontSize:11}}>Xoá</button>}
                 </td>
               </tr>
             ))}
@@ -904,6 +961,21 @@ const InventoryPage = ({ materials, setMaterials, currentUser }) => {
         <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
           <button onClick={()=>setShowImport(null)} style={css.btnS}>Huỷ</button>
           <button onClick={doImport} style={{...css.btnP, background:"#10b981"}}>Xác nhận</button>
+        </div>
+      </Modal>
+
+      <Modal open={!!showEdit} onClose={()=>setShowEdit(null)} title={`Chỉnh sửa: ${showEdit?.name}`}>
+        {[{l:"Tên NVL",k:"name",t:"text"},{l:"Tồn kho",k:"stock",t:"number"},{l:"Đơn giá (VNĐ)",k:"price",t:"number"},{l:"Nhà cung cấp",k:"supplier",t:"text"}].map(f=>(
+          <Field key={f.k} label={f.l}><input type={f.t} style={css.input} value={editForm[f.k]} onChange={e=>setEditForm({...editForm,[f.k]:e.target.value})} /></Field>
+        ))}
+        <Field label="Đơn vị">
+          <select style={css.select} value={editForm.unit} onChange={e=>setEditForm({...editForm,unit:e.target.value})}>
+            {["kg","lít","cái","gói","thùng","hộp","tấn"].map(u=><option key={u}>{u}</option>)}
+          </select>
+        </Field>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:12 }}>
+          <button onClick={()=>setShowEdit(null)} style={css.btnS}>Huỷ</button>
+          <button onClick={saveEdit} style={css.btnP}>Lưu thay đổi</button>
         </div>
       </Modal>
     </div>
